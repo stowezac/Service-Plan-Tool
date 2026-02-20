@@ -1,14 +1,14 @@
 import streamlit as st
 
-st.set_page_config(page_title="Veteran Service Plan Tool", layout="wide")
+st.set_page_config(page_title="Veteran Participant Success Tool", layout="wide")
 
 st.title("Veteran Participant Success Tool")
-st.write("Enter the answers exactly as they appear on the paper forms to generate a Service Plan Report.")
+st.write("Complete the assessment to generate a Priority-Based Service Plan.")
 
-# --- TABS FOR ORGANIZED ENTRY ---
-tab1, tab2, tab3, tab4 = st.tabs(["PHQ-9 (Mood)", "WEMWBS (Well-being)", "ISEL-12 (Social)", "SES (Socio-Economic)"])
+# --- TABS FOR ENTRY ---
+tab1, tab2, tab3, tab4 = st.tabs(["PHQ-9", "WEMWBS", "ISEL-12", "SES"])
 
-# --- TAB 1: PHQ-9 ---
+# --- TAB 1: PHQ-9 (Original Order) ---
 with tab1:
     st.header("PHQ-9: Depressive Symptoms")
     phq_questions = [
@@ -24,31 +24,21 @@ with tab1:
     ]
     phq_answers = []
     options = {"Not at all": 0, "Several days": 1, "More than half the days": 2, "Nearly every day": 3}
-    
     for i, q in enumerate(phq_questions):
         ans = st.radio(f"{i+1}. {q}", options.keys(), key=f"phq_{i}", horizontal=True)
         phq_answers.append(options[ans])
-    
     phq_total = sum(phq_answers)
     phq_q9 = phq_answers[8]
 
 # --- TAB 2: WEMWBS ---
 with tab2:
     st.header("WEMWBS: Mental Well-being")
-    wem_questions = [
-        "Optimistic about the future", "Feeling useful", "Feeling relaxed", 
-        "Interested in other people", "Energy to spare", "Dealing with problems well",
-        "Thinking clearly", "Feeling good about myself", "Feeling close to other people",
-        "Feeling confident", "Feeling loved", "Able to make up my own mind",
-        "Interested in new things", "Feeling cheerful"
-    ]
+    wem_questions = ["Optimistic about the future", "Feeling useful", "Feeling relaxed", "Interested in other people", "Energy to spare", "Dealing with problems well", "Thinking clearly", "Feeling good about myself", "Feeling close to other people", "Feeling confident", "Feeling loved", "Able to make up my own mind", "Interested in new things", "Feeling cheerful"]
     wem_answers = []
     wem_options = {"None of the time": 1, "Rarely": 2, "Some of the time": 3, "Often": 4, "All of the time": 5}
-    
     for i, q in enumerate(wem_questions):
         ans = st.radio(f"I've been... {q}", wem_options.keys(), key=f"wem_{i}", horizontal=True)
         wem_answers.append(wem_options[ans])
-    
     wem_total = sum(wem_answers)
 
 # --- TAB 3: ISEL-12 ---
@@ -68,53 +58,66 @@ with tab3:
         ("If a crisis arose, it would be hard to find advice.", "Appraisal"),
         ("If I needed help moving, I'd have a hard time finding help.", "Tangible")
     ]
-    
     isel_scores = {"Appraisal": 0, "Belonging": 0, "Tangible": 0}
-    isel_options = {"Definitely False": 1, "Probably False": 2, "Probably True": 3, "Definitely True": 4}
-
-    for i, (q, category) in enumerate(isel_questions):
-        ans = st.selectbox(q, isel_options.keys(), key=f"isel_{i}")
-        score = isel_options[ans]
-        
-        # Scoring logic: some questions are 'reverse scored' (negative framing)
-        if "hard time" in q or "no one" in q or "difficult" in q or "don't often" in q:
+    isel_opts = {"Definitely False": 1, "Probably False": 2, "Probably True": 3, "Definitely True": 4}
+    for i, (q, cat) in enumerate(isel_questions):
+        ans = st.selectbox(q, isel_opts.keys(), key=f"isel_{i}")
+        score = isel_opts[ans]
+        if any(word in q.lower() for word in ["hard time", "no one", "difficult", "don't often"]):
             score = 5 - score
-        
-        isel_scores[category] += score
+        isel_scores[cat] += score
 
 # --- TAB 4: SES ---
 with tab4:
     st.header("SES: Socio-Economic Status")
-    income_sources = st.multiselect("Regular sources of income:", ["Disability", "VA Pension", "Employment", "Savings", "Other"])
     emp_status = st.selectbox("Current employment status:", ["Employed", "Unemployed", "Disabled", "Retired"])
     needs_struggle = st.radio("Difficulty covering medical, food, and housing?", ["No", "Yes"])
-    income_reduced = st.radio("Has your income been reduced?", ["No", "Yes"])
-    stress = st.radio("Experiencing stress over financial situation?", ["No", "Yes"])
+    income_reduced = st.radio("Has your income been reduced by $30k+ recently?", ["No", "Yes"])
+    stress = st.radio("Is the Veteran experiencing significant financial stress?", ["No", "Yes"])
 
-# --- GENERATE REPORT BUTTON ---
-if st.button("Generate Final Service Plan Report"):
+# --- REPORT GENERATION ---
+if st.button("Generate High-Priority Service Plan"):
     st.divider()
-    st.subheader("PARTICIPANT INSIGHT REPORT")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.write("### Assessment Totals")
-        st.write(f"**PHQ-9 Score:** {phq_total}")
-        st.write(f"**Well-being (WEMWBS) Score:** {wem_total}")
-        st.write(f"**Social Support (ISEL-12) Score:** {sum(isel_scores.values())}")
+    st.title("PARTICIPANT SERVICE PLAN & TRIAGE REPORT")
 
-    with col2:
-        st.write("### Clinical & Social Insights")
-        if phq_q9 > 0:
-            st.error("!! CRITICAL: Thoughts of self-harm reported. Immediate Safety Plan review required.")
-        if isel_scores['Appraisal'] < 8:
-            st.warning("* Peer Focus: Veteran lacks a confidant for advice. Build trust-based mentoring.")
-        if isel_scores['Tangible'] < 8:
-            st.warning("* Resource Focus: High need for physical/logistical help (transportation/housing).")
-
-    st.write("### Economic Roadmap")
+    # PRIORITY 1: IMMEDIATE INTERVENTION (RED)
+    st.error("### 🔴 PRIORITY 1: IMMEDIATE INTERVENTION")
+    p1_count = 0
+    if phq_q9 > 0:
+        st.write("**CRITICAL: Suicide Risk Detected.** Participant indicated thoughts of self-harm. Action: Immediate Safety Plan and clinical escalation.")
+        p1_count += 1
     if needs_struggle == "Yes":
-        st.error("* URGENT: Basic needs not being met. Immediate referral to food/housing assistance.")
-    if income_reduced == "Yes":
-        st.info("* Action: Significant income drop detected. Refer for VA Benefits review and Financial Counseling.")
+        st.write("**STABILITY: Basic Needs Gap.** Difficulty with food, housing, or medical. Action: Emergency resource warm hand-off (Food bank, HUD-VASH, etc.).")
+        p1_count += 1
+    if p1_count == 0: st.write("*No Priority 1 issues identified.*")
+
+    # PRIORITY 2: STRATEGIC STABILIZATION (YELLOW)
+    st.warning("### 🟡 PRIORITY 2: STRATEGIC STABILIZATION")
+    p2_count = 0
+    if phq_total >= 15:
+        st.write(f"**MENTAL HEALTH: Severe Depression (Score: {phq_total}).** Participant is highly symptomatic. Action: Refer to clinical counseling.")
+        p2_count += 1
+    if emp_status == "Unemployed":
+        st.write("**ECONOMIC: Lack of Employment.** Action: Refer to vocational training or VA employment representative.")
+        p2_count += 1
+    if isel_scores['Tangible'] <= 6:
+        st.write("**SOCIAL: Low Tangible Support.** Lacks physical help (rides, chores). Action: Peer support to assist with logistics.")
+        p2_count += 1
+    if p2_count == 0: st.write("*No Priority 2 issues identified.*")
+
+    # PRIORITY 3: PEER SUPPORT & CONNECTION (BLUE)
+    st.info("### 🔵 PRIORITY 3: PEER SUPPORT & CONNECTION")
+    p3_count = 0
+    if wem_total < 40:
+        st.write(f"**WELL-BEING: Low Mental Flourishing (Score: {wem_total}).** Action: Assign Peer Specialist for optimism-building and 'Value' check-ins.")
+        p3_count += 1
+    if isel_scores['Belonging'] <= 6:
+        st.write("**SOCIAL: Isolation.** Lacks people to do things with. Action: Invite to Veteran social cohorts or group activities.")
+        p3_count += 1
+    if isel_scores['Appraisal'] <= 6:
+        st.write("**SOCIAL: No Confidant.** Lacks someone for advice. Action: Focus Peer Specialist relationship on building deep trust.")
+        p3_count += 1
+    if p3_count == 0: st.write("*No Priority 3 issues identified.*")
+
+    st.divider()
+    st.write("**Manager Notes:** Use this priority list to guide the warm hand-offs. Address Red flags first before moving to social or well-being goals.")
